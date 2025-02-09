@@ -20,6 +20,7 @@ export const enableGeoTIFFTileSource = (OpenSeadragon) => {
    * @param {File|String|Object} input A File object, url string, or object with fields for pre-loaded GeoTIFF and GeoTIFFImages objects
    * @param {Object} opts Options object. To do: how to document options fields?
    *                 opts.logLatency: print latency to fetch and process each tile to console.log or the provided function
+   *                 opts.imagesFilter: array of indices to filter images by, or an array filter function to apply to the images array
    *                 opts.tileWidth: tileWidth to request at each level. Defaults to tileWidth specified by TIFF file or 256 if unspecified by the file
    *                 opts.tileHeight:tileWidth to request at each level. Defaults to tileWidth specified by TIFF file or 256 if unspecified by the file
    * @param {Object} GeoTIFFOpts Options object to pass to [geotiff.js]{@link https://github.com/geotiffjs/geotiff.js}
@@ -91,6 +92,8 @@ export const enableGeoTIFFTileSource = (OpenSeadragon) => {
             return Promise.all(promises);
           })
           .then((images) => {
+            images = self.constructor.userDefinedImagesFilter(images, opts);
+
             self.GeoTIFFImages = images;
             self.promises.GeoTIFFImages.resolve(images);
             this.setupLevels();
@@ -125,6 +128,8 @@ export const enableGeoTIFFTileSource = (OpenSeadragon) => {
           Promise.all([...Array(c).keys()].map(async (index) => (await tiff).getImage(index)))
         )
         .then((images) => {
+          images = this.userDefinedImagesFilter(images, opts);
+
           // Filter out images with photometricInterpretation.TransparencyMask
           images = images.filter(
             (image) =>
@@ -521,6 +526,19 @@ export const enableGeoTIFFTileSource = (OpenSeadragon) => {
           return dataURL;
         });
       }
+    };
+
+    static userDefinedImagesFilter = (images, opts) => {
+      if (typeof opts.imagesFilter !== 'undefined' && opts.imagesFilter) {
+        if (Array.isArray(opts.imagesFilter))
+          images = images.filter((_, idx) => opts.imagesFilter.includes(idx));
+        else if (typeof opts.imagesFilter === "function")
+          images = images.filter(opts.imagesFilter);
+
+        opts.imagesFilter = undefined;
+      }
+
+      return images;
     };
   }
 
